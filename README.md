@@ -47,6 +47,8 @@ src/main/java/com/stevenzhang/studyroom_booking
 
 **Two layers of overlap protection.** The service checks for conflicts before inserting, which gives fast, readable errors in the common case. But check-then-act is racy under concurrent requests, so the database enforces the invariant with a PostgreSQL exclusion constraint:
 
+**Serializing each user's bookings for the daily limit.** Rule 3 is an aggregate over many rows, which no constraint can express. Instead, `createBooking` locks the user's row with `@Lock(PESSIMISTIC_WRITE)` (`SELECT ... FOR UPDATE`) before checking the limit, so concurrent requests from the same user run one at a time while different users never block each other. A test firing 6 simultaneous one-hour requests from one user confirms that exactly 3 succeed.
+
 ```sql
 ALTER TABLE bookings
     ADD CONSTRAINT bookings_no_overlap
@@ -64,13 +66,13 @@ In a test that fires 8 simultaneous requests for the same slot, all 8 passed the
 
 ## Testing
 
-43 tests, run on every push by GitHub Actions:
+44 tests, run on every push by GitHub Actions:
 
 | Layer | Tests | Coverage |
 |---|---|---|
 | Domain unit tests | 27 | Slot validation, overlap edge cases, opening hours, status transitions |
 | Service unit tests (Mockito) | 8 | Orchestration of rules 2 and 3, fail-fast checks, nothing saved on rejection |
-| Integration tests (Testcontainers) | 8 | JPQL queries against real PostgreSQL, full context startup, concurrent booking |
+| Integration tests (Testcontainers) | 9 | JPQL queries against real PostgreSQL, full context startup, concurrent booking |
 
 ```bash
 ./mvnw verify   # requires Docker for Testcontainers
@@ -114,7 +116,6 @@ Requesting an overlapping slot returns:
 
 ## Known limitations and next steps
 
-- **Daily limit under concurrency.** Rule 3 is only checked in the application, so simultaneous requests from the same user for different rooms could exceed 3 hours. Planned fix: lock the user row (`SELECT ... FOR UPDATE`) at the start of `createBooking`.
 - **No authentication.** Any caller can act on behalf of any user. Planned: Spring Security with JWT, plus ownership checks on cancellation.
 - **Single time zone by design.** Times are stored as `TIMESTAMP` in campus time. Supporting multiple campuses would mean moving to `TIMESTAMPTZ` and `Instant`.
 - **Rooms and users** are currently seeded rather than managed through the API.

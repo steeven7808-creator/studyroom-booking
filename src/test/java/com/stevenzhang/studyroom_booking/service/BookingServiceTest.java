@@ -63,7 +63,7 @@ class BookingServiceTest {
 
     private void givenRoomAndUserExist() {
         when(roomRepository.findById(ROOM_ID)).thenReturn(Optional.of(ROOM));
-        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(USER));
+        when(userRepository.findByIdForUpdate(USER_ID)).thenReturn(Optional.of(USER));
     }
 
     private void givenNoOverlap(TimeSlot slot) {

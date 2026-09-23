@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -33,7 +34,6 @@ import org.springframework.dao.DataIntegrityViolationException;
 class BookingConcurrencyIntegrationTest {
 
     private static final LocalDate DAY = LocalDate.now(ClockConfig.CAMPUS_ZONE).plusDays(7);
-    private static final int THREADS = 8;
 
     @Autowired private BookingService bookingService;
     @Autowired private BookingRepository bookingRepository;
@@ -53,14 +53,51 @@ class BookingConcurrencyIntegrationTest {
                 LocalDateTime.of(DAY, LocalTime.parse(end)));
     }
 
-    private Room saveRoom() {
-        return roomRepository.save(new Room("IKB 101", "Irving K. Barber Learning Centre", 6,
+    private Room saveRoom(String name) {
+        return roomRepository.save(new Room(name, "Irving K. Barber Learning Centre", 6,
                 LocalTime.of(8, 0), LocalTime.of(22, 0)));
+    }
+
+    private Callable<Boolean> bookingAttempt(Long roomId, Long userId, TimeSlot slot) {
+        return () -> {
+            try {
+                bookingService.createBooking(roomId, userId, slot);
+                return true;
+            } catch (BookingRuleViolationException e) {
+                return false;
+            }
+        };
+    }
+
+    /** Starts all tasks at the same moment and returns how many of them succeeded. */
+    private int countSuccesses(List<Callable<Boolean>> tasks) throws Exception {
+        CountDownLatch startSignal = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(tasks.size());
+        try {
+            List<Future<Boolean>> results = new ArrayList<>();
+            for (Callable<Boolean> task : tasks) {
+                results.add(executor.submit(() -> {
+                    startSignal.await(); // every thread waits here, then all start at once
+                    return task.call();
+                }));
+            }
+            startSignal.countDown();
+
+            int successes = 0;
+            for (Future<Boolean> result : results) {
+                if (result.get()) {
+                    successes++;
+                }
+            }
+            return successes;
+        } finally {
+            executor.shutdown();
+        }
     }
 
     @Test
     void databaseRejectsOverlapEvenWithoutTheServiceCheck() {
-        Room room = saveRoom();
+        Room room = saveRoom("IKB 101");
         User alice = userRepository.save(new User("Alice", "alice@example.com"));
         User bob = userRepository.save(new User("Bob", "bob@example.com"));
         LocalDateTime now = DAY.minusDays(1).atTime(12, 0);
@@ -73,37 +110,30 @@ class BookingConcurrencyIntegrationTest {
 
     @Test
     void onlyOneOfManyConcurrentRequestsForTheSameSlotSucceeds() throws Exception {
-        Room room = saveRoom();
-        List<User> users = new ArrayList<>();
-        for (int i = 0; i < THREADS; i++) {
-            users.add(userRepository.save(new User("User " + i, "user" + i + "@example.com")));
-        }
+        Room room = saveRoom("IKB 101");
         TimeSlot slot = slot("10:00", "11:00");
-        CountDownLatch startSignal = new CountDownLatch(1);
-
-        ExecutorService executor = Executors.newFixedThreadPool(THREADS);
-        List<Future<Boolean>> results = new ArrayList<>();
-        for (User user : users) {
-            results.add(executor.submit(() -> {
-                startSignal.await(); // every thread waits here, then all start at once
-                try {
-                    bookingService.createBooking(room.getId(), user.getId(), slot);
-                    return true;
-                } catch (BookingRuleViolationException e) {
-                    return false;
-                }
-            }));
+        List<Callable<Boolean>> attempts = new ArrayList<>();
+        for (int i = 0; i < 8; i++) {
+            User user = userRepository.save(new User("User " + i, "user" + i + "@example.com"));
+            attempts.add(bookingAttempt(room.getId(), user.getId(), slot));
         }
-        startSignal.countDown();
-        executor.shutdown();
 
-        int successes = 0;
-        for (Future<Boolean> result : results) {
-            if (result.get()) {
-                successes++;
-            }
-        }
-        assertEquals(1, successes);
+        assertEquals(1, countSuccesses(attempts));
         assertEquals(1, bookingRepository.count());
+    }
+
+    @Test
+    void concurrentRequestsFromOneUserCannotExceedTheDailyLimit() throws Exception {
+        User user = userRepository.save(new User("Steven", "steven@example.com"));
+        TimeSlot oneHour = slot("10:00", "11:00");
+        List<Callable<Boolean>> attempts = new ArrayList<>();
+        for (int i = 0; i < 6; i++) {
+            Room room = saveRoom("Room " + i);
+            attempts.add(bookingAttempt(room.getId(), user.getId(), oneHour));
+        }
+
+        // Six one-hour requests in different rooms; the 3-hour daily limit allows exactly three.
+        assertEquals(3, countSuccesses(attempts));
+        assertEquals(3, bookingRepository.count());
     }
 }

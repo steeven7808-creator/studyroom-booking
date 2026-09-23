@@ -41,7 +41,8 @@ public class BookingService {
     public Booking createBooking(Long roomId, Long userId, TimeSlot slot) {
         Room room = roomRepository.findById(roomId)
                 .orElseThrow(() -> new ResourceNotFoundException("Room " + roomId + " not found"));
-        User user = userRepository.findById(userId)
+                // Lock the user's row so concurrent bookings by the same user run one at a time (rule 3).
+        User user = userRepository.findByIdForUpdate(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User " + userId + " not found"));
 
         // Rule 1 and "no past bookings": the domain object checks these itself, no DB needed.
