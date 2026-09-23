@@ -66,9 +66,18 @@ public class BookingService {
 
     @Transactional
     public Booking cancelBooking(Long bookingId) {
-        Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new ResourceNotFoundException("Booking " + bookingId + " not found"));
+        Booking booking = findBooking(bookingId);
         booking.cancel(LocalDateTime.now(clock));
         return booking;
+    }
+
+    @Transactional(readOnly = true)
+    public Booking getBooking(Long bookingId) {
+        return findBooking(bookingId);
+    }
+
+    private Booking findBooking(Long bookingId) {
+        return bookingRepository.findById(bookingId)
+            .orElseThrow(() -> new ResourceNotFoundException("Booking " + bookingId + " not found"));
     }
 }
