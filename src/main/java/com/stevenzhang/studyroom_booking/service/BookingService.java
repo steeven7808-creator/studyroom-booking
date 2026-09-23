@@ -14,11 +14,13 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.DataIntegrityViolationException;
 
 @Service
 public class BookingService {
 
     public static final Duration DAILY_LIMIT = Duration.ofHours(3);
+    static final String OVERLAP_CONSTRAINT = "bookings_no_overlap";
 
     private final BookingRepository bookingRepository;
     private final RoomRepository roomRepository;
@@ -60,8 +62,14 @@ public class BookingService {
         if (alreadyBooked.plus(slot.duration()).compareTo(DAILY_LIMIT) > 0) {
             throw new BookingRuleViolationException("Daily booking limit of 3 hours would be exceeded");
         }
-
-        return bookingRepository.save(booking);
+                try {
+            return bookingRepository.saveAndFlush(booking);
+        } catch (DataIntegrityViolationException ex) {
+            if (isOverlapViolation(ex)) {
+                throw new BookingRuleViolationException("The room is already booked for this time");
+            }
+            throw ex;
+        }
     }
 
     @Transactional
@@ -79,5 +87,10 @@ public class BookingService {
     private Booking findBooking(Long bookingId) {
         return bookingRepository.findById(bookingId)
             .orElseThrow(() -> new ResourceNotFoundException("Booking " + bookingId + " not found"));
+    }
+
+        private static boolean isOverlapViolation(DataIntegrityViolationException ex) {
+        String message = ex.getMostSpecificCause().getMessage();
+        return message != null && message.contains(OVERLAP_CONSTRAINT);
     }
 }

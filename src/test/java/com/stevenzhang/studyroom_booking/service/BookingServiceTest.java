@@ -80,7 +80,7 @@ class BookingServiceTest {
     }
 
     private void givenSaveReturnsItsArgument() {
-        when(bookingRepository.save(any(Booking.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(bookingRepository.saveAndFlush(any(Booking.class))).thenAnswer(inv -> inv.getArgument(0));
     }
 
     @Test
@@ -95,7 +95,7 @@ class BookingServiceTest {
 
         assertEquals(BookingStatus.CONFIRMED, booking.getStatus());
         assertEquals(slot, booking.getSlot());
-        verify(bookingRepository).save(booking);
+        verify(bookingRepository).saveAndFlush(booking);
     }
 
     @Test
@@ -106,7 +106,7 @@ class BookingServiceTest {
 
         assertThrows(BookingRuleViolationException.class,
                 () -> service.createBooking(ROOM_ID, USER_ID, slot));
-        verify(bookingRepository, never()).save(any());
+        verify(bookingRepository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -129,7 +129,7 @@ class BookingServiceTest {
 
         assertThrows(BookingRuleViolationException.class,
                 () -> service.createBooking(ROOM_ID, USER_ID, slot));
-        verify(bookingRepository, never()).save(any());
+        verify(bookingRepository, never()).saveAndFlush(any());
     }
 
     @Test
