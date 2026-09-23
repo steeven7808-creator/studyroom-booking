@@ -14,7 +14,7 @@ A REST API for booking study rooms at UBC, built with Java 25, Spring Boot 4 and
 
 ## Tech stack
 
-Java 25 · Spring Boot 4.1 (Web MVC, Data JPA, Validation) · Hibernate 7 · PostgreSQL 18 · Flyway · JUnit · Mockito · Testcontainers · Docker Compose · GitHub Actions
+Java 25 · Spring Boot 4.1 (Web MVC, Data JPA, Validation) · Hibernate 7 · PostgreSQL 18 · Flyway · JUnit · Mockito · Testcontainers · Docker Compose · GitHub Actions · springdoc-openapi (Swagger UI)
 
 ## Architecture
 
@@ -84,7 +84,7 @@ Prerequisites: JDK 25 and Docker.
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
-Spring Boot starts PostgreSQL through Docker Compose, Flyway applies the migrations, and the `dev` profile seeds three rooms and two users.
+Spring Boot starts PostgreSQL through Docker Compose, Flyway applies the migrations, and the `dev` profile seeds three rooms and two users. Interactive API documentation is available at http://localhost:8080/swagger-ui.html once the app is running.
 
 ## API
 
