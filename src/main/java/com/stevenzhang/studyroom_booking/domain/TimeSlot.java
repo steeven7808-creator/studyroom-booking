@@ -3,10 +3,12 @@ package com.stevenzhang.studyroom_booking.domain;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Objects;
+import jakarta.persistence.Embeddable;
 
 /**
  * An immutable half-open time interval [start, end).
  */
+@Embeddable
 public record TimeSlot(LocalDateTime start, LocalDateTime end) {
 
     public TimeSlot {
