@@ -4,6 +4,10 @@
 
 A REST API for booking study rooms at UBC, built with Java 25, Spring Boot 4 and PostgreSQL. The focus is on enforcing business rules correctly under concurrency: two students can never hold the same room at the same time, even when their requests arrive simultaneously.
 
+**Live demo:** [studyroom-booking.onrender.com/swagger-ui.html](https://studyroom-booking.onrender.com/swagger-ui.html). Try `POST /api/bookings` twice with the example body to watch the overlap rule reject the second request.
+
+> Hosted on Render's free tier with a Neon serverless PostgreSQL database. The service sleeps when idle, so the first request after a while can take up to about 2 minutes.
+
 ## Business rules
 
 1. A booking must fall within the room's opening hours, align to 30-minute boundaries, and last at most 2 hours.
@@ -14,7 +18,7 @@ A REST API for booking study rooms at UBC, built with Java 25, Spring Boot 4 and
 
 ## Tech stack
 
-Java 25 · Spring Boot 4.1 (Web MVC, Data JPA, Validation) · Hibernate 7 · PostgreSQL 18 · Flyway · JUnit · Mockito · Testcontainers · Docker Compose · GitHub Actions · springdoc-openapi (Swagger UI)
+Java 25 · Spring Boot 4.1 (Web MVC, Data JPA, Validation) · Hibernate 7 · PostgreSQL 18 · Flyway · JUnit · Mockito · Testcontainers · Docker Compose · GitHub Actions · springdoc-openapi (Swagger UI) · Docker · Render · Neon
 
 ## Architecture
 
@@ -87,6 +91,10 @@ Prerequisites: JDK 25 and Docker.
 ```
 
 Spring Boot starts PostgreSQL through Docker Compose, Flyway applies the migrations, and the `dev` profile seeds three rooms and two users. Interactive API documentation is available at http://localhost:8080/swagger-ui.html once the app is running.
+
+## Deployment
+
+The app ships as a multi-stage Docker image (JDK build stage, JRE-only runtime). The `demo` profile reads all database settings from environment variables, trusts the platform proxy's forwarded headers so generated URLs use HTTPS, and lets idle connections close so the serverless database can scale to zero. Render redeploys automatically from `main`.
 
 ## API
 

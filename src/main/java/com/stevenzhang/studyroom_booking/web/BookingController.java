@@ -31,6 +31,9 @@ public class BookingController {
             description = "Checks opening hours, 30-minute alignment, the 2-hour cap, "
                     + "room availability and the user's 3-hour daily limit.")
     @ApiResponse(responseCode = "201", description = "Booking created")
+    @ApiResponse(responseCode = "400", description = "Malformed request or invalid fields")
+    @ApiResponse(responseCode = "404", description = "Room or user not found")
+    @ApiResponse(responseCode = "422", description = "Breaks a booking rule, e.g. overlap or daily limit")
     @PostMapping
     public ResponseEntity<BookingResponse> create(@Valid @RequestBody CreateBookingRequest request) {
         Booking booking = bookingService.createBooking(
@@ -43,6 +46,8 @@ public class BookingController {
     }
 
     @Operation(summary = "Get a booking by id")
+    @ApiResponse(responseCode = "200", description = "Booking found")
+    @ApiResponse(responseCode = "404", description = "Booking not found")
     @GetMapping("/{id}")
     public BookingResponse get(@PathVariable Long id) {
         return BookingResponse.from(bookingService.getBooking(id));
@@ -50,6 +55,9 @@ public class BookingController {
 
     @Operation(summary = "Cancel a booking",
             description = "Only confirmed bookings that have not started yet can be cancelled.")
+    @ApiResponse(responseCode = "200", description = "Booking cancelled")
+    @ApiResponse(responseCode = "404", description = "Booking not found")
+    @ApiResponse(responseCode = "422", description = "Booking has already started or is not confirmed")
     @PostMapping("/{id}/cancel")
     public BookingResponse cancel(@PathVariable Long id) {
         return BookingResponse.from(bookingService.cancelBooking(id));
